@@ -1,0 +1,70 @@
+#include  "bsp.h"
+
+            MODULE BSP
+            PUBLIC GPIOconfig,TIMERconfig,TIMER1config,ADCconfig
+            EXTERN StartTimer,StopTimer,EnableTAIFG,DisableTAIFG,ClearTAIFG
+            EXTERN main,PBs_handler,TimerA_ISR
+            
+            RSEG   CODE                    
+;-----------------------------------------------------------------------------  
+;           GPIO congiguration
+;-----------------------------------------------------------------------------
+GPIOconfig   mov.w   #WDTPW+WDTHOLD,&WDTCTL   ; hold watchdog timer
+             ; PushButtons Setup
+             bic.b   #0xE7,PBsArrPortSel     ; 1110 0111 <- everything but 2.4 and 2.3 are I/O
+             bis.b   #0x10,PBsArrPortSel     ; 0001 1000 <- Set P2.4 and P2.3 SEL = 1
+             bis.b   #0xE0, LCDCMDDIR        ; Set LCD CMD lines to OUTPUT
+             //bic.b   #0x0F,PBsArrPortDir
+             bic.b   #0xFF,PBsArrIntEdgeSel   ; pull-up
+             bis.b   #0x03,PBsArrIntEdgeSel   ; pull-up
+             //bic.b   #0x03,PBsArrIntEdgeSel ; pull-down
+             bis.b   #0x03,PBsArrIntEn
+             bic.b   #0xFF,PBsArrIntPend      ; clear pending interrupts
+             //LCD
+             bic.b #0xE0, LCDCMDPort          ; Clear Output
+             bic.b #0xFF, LCDDataSEL          ; Set LCD data byte to I/O
+             bis.b #0xFF, LCDDataDIR          ; Set LCD data byte to OUTPUT
+             bic.b #0xFF, LCDDataPort         ; Set LCD CMD lines to I/O
+
+             ; Switches Setup
+             //bic.b   #0x0F,SWsArrPortSel
+             //bic.b   #0x0F,SWsArrPortDir
+             
+             ; LEDs Setup
+             //bic.b   #0xFF,LEDsArrPortSel ; GPIO capability
+             //bis.b   #0xFF,LEDsArrPortDir ; output dir
+             //clr.b   LEDsArrPort    ; clear LEDs
+             
+             ret
+;------------------------------------------------------------------------------------- 
+;            Timers congiguration 
+;-------------------------------------------------------------------------------------
+TIMERconfig   //bis #TACLR,  Timer_A_CTL ; clear all Timer_A preferences
+              bis #MC_3+ID_3+TASSEL_2, Timer_A_CTL ; CONFIG: Timer_A Interrupt DISABLED,
+                                       ;         MCx set to 11 (UP\DOWN)
+                                       ;         DIV by 8           
+                                       ;         Set CLK to SMCLK (2^20 / 2^3 HZ = 2^17 HZ)
+                                       ;         Set counter length to 16 bit (TBR max = 2^16)
+              bis #CCIE, Timer_A_CC0_CTL
+                                              ; Compare mode
+                                              ; Allow CCIFG interrupt
+              mov #0xFFFA, Timer_A_CC0_Reg    ; Value of interrupt
+              ret
+;------------------------------------------------------------------------------------- 
+;            Timers congiguration 
+;-------------------------------------------------------------------------------------
+TIMER1config  mov.w     #TACLR,Timer_A1_CTL
+              mov.w     #CM_1+SCS+CAP+CCIE, Timer_A1_CC2_CTL
+              mov.w     #TASSEL_2+MC_2+ID_3, Timer_A1_CTL
+              ret
+;-------------------------------------------------------------------------------------- 
+;            ADC congiguration 
+;--------------------------------------------------------------------------------------
+ADCconfig
+            nop ; write here ADC congiguration code
+
+            ret
+
+            
+             ENDMOD
+             END

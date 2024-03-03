@@ -1,0 +1,29 @@
+#include <msp430g2553.h>     ;define controlled include file
+
+      NAME Main
+      PUBLIC Main
+      EXTERN CONFIG, ST01, ST02, ST04, STOT
+
+          ORG 0x0200
+IDA       DW   0,8,1,1,7,5,9,8  ; positive numbers - ID1
+IDB       DW   1,4,8,6,9,4,8,8  ; positive numbers - ID2
+SIZE      DW   8                ; positive number - Arrays size
+
+Main      MOV #0x03FF,SP
+StopWDT   MOV.W #WDTPW+WDTHOLD,&WDTCTL
+
+          MOV #IDA, R4
+          MOV #IDB, R5
+          MOV SIZE, R6
+
+          CALL #CONFIG
+Loop      CALL #ST01
+          CALL #ST02
+          CALL #ST04
+          CALL #STOT
+          JMP Loop
+          NOP
+//-------------------------------
+          ORG    0FFFEh
+          DW     Main
+          end

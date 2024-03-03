@@ -1,0 +1,49 @@
+#include "bsp.h"
+                 MODULE   HAL
+                 PUBLIC   SysConfig,ClearLeds,Delay,PORT2_ISR
+                 EXTERN   GPIOconfig
+                 EXTERN   state
+                 
+                 RSEG     CODE
+//==============================================================================
+//               System Conf.
+//==============================================================================
+SysConfig        CALL     #GPIOconfig
+                 RET
+//==============================================================================
+//               Leds Display Clearing
+//==============================================================================
+ClearLeds        CLR.B      LedsOUT
+                 RET
+//==============================================================================
+//               Port2 Interrupt Service Routine
+//==============================================================================
+PORT2_ISR        CALL     #Delay            //Debounce
+                 BIT.B    #0x01,PBsPEND     //CHECK IF PB0 IS PUSHED                
+                 JNZ      PB0
+                 BIT.B    #0x02,PBsPEND     //CHECK IF PB1 IS PUSHED
+                 JNZ      PB1
+                 BIT.B    #0x04,PBsPEND     //CHECK IF PB2 IS PUSHED
+                 JNZ      PB2
+                 RETI
+                  
+PB0              MOV      #1,state          //UPDATING STATE TO ENTER State1 ROUTINE ON MAIN
+                 JMP      WAKEUP
+PB1              MOV      #2,state          //UPDATING STATE TO ENTER State2 ROUTINE ON MAIN
+                 JMP      WAKEUP 
+PB2              MOV      #3,state          //UPDATING STATE TO ENTER State3 ROUTINE ON MAIN
+                 JMP      WAKEUP
+                  
+WAKEUP           BIC      #CPUOFF,0(SP)     //EXIT LMP0
+                 BIC.B    #0x07,PBsPEND
+                 RETI
+//==============================================================================
+//               Delay Function 
+//==============================================================================
+Delay            MOV       #DebounceValUp,R5
+L                DEC.W     R5
+                 JNZ       L
+                 RET
+//==============================================================================
+                 ENDMOD
+                 END

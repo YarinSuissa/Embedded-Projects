@@ -1,0 +1,240 @@
+#include  "bsp.h"
+
+              MODULE HAL
+              PUBLIC SysConfig,PBs_handler,poll_delay,StackFreqPrinter
+              PUBLIC LCDConfig,LCD_CMD,LCDClear,LCDCursorTo1,LCDCursorTo17,
+              PUBLIC LCDCursorOff,LCDCursorOn,LCDCursorR,LCDCursorL,LCDPrintChar
+              PUBLIC LCDClear,PBs_handler,StopTimer
+              PUBLIC EnableTAIFG,DisableTAIFG,ClearTAIFG
+              PUBLIC TimerA0_ISR,TimerA1_ISR
+              EXTERN GPIOconfig,TIMERconfig,ADCconfig
+              EXTERN state,TIMERconfig,LCDCountdown,flag,margin
+            
+              RSEG   CODE
+;--------------------------------------------------------------------
+;             System Configuration  
+;--------------------------------------------------------------------
+SysConfig     call #GPIOconfig
+              //call #TIMERconfig
+              //call #LCDConfig
+              call #ADCconfig
+              mov.w #0,state
+              ret
+;------------------------------------------------------------------------------------- 
+;            LCD congiguration 
+;-------------------------------------------------------------------------------------
+;-----------LCD initalization commands
+LCDConfig   bic.b #LCDRS, LCDCMDPort       ; clear RS
+            bic.b #LCDRW, LCDCMDPort       ; clear RW
+            bic.b #LCDE,  LCDCMDPort       ; clear E flag
+            clr R6                        ; clear R6 reserved for LCD_CMD
+            push #5250                  //delay here 15msec
+            call #poll_delay
+;___________First write
+            mov.b #0x3F,  LCDDataPort     ; Data Byte = 0x3F
+            call #LCD_Strobe              ; strobe routine
+            push #1750                  //delay here 5msec
+            call #poll_delay
+;___________Second write
+            mov.b #0x3F,  LCDDataPort     ; Data Byte = 0x3F
+            call #LCD_Strobe              ; strobe routine
+            push #70                
+            call #poll_delay              //delay here 200u-sec
+;___________Third write
+            mov.b #0x3F,  LCDDataPort     ; Data Byte = 0x3F
+            call #LCD_Strobe              ; strobe routine            
+            push.w #0x3C
+            call #LCD_CMD                 ; lcd_cmd #0x3C
+            call #LCDCursorOn             ; lcd_cmd #0x0F -- cursor on
+            call #LCDClear                ; lcd_cmd #0x01 -- LCD clear
+            push.w #0x06
+            call #LCD_CMD                 ; lcd_cmd #0x06
+            push.w #0x80
+            call #LCD_CMD                 ; lcd_cmd #0x80
+            call #LCDCursorTo1            ; lcd_cmd #0x02 -- back to start
+            call #LCDCursorOff            ; Turn cursor off - just for visuals
+            ret
+            
+;-----------LCD Strobe
+LCD_Strobe  bis.b #LCDE, LCDCMDPort        ; set E=1
+            nop
+            nop
+            bic.b #LCDE, LCDCMDPort        ; set E=0
+            ret
+
+;-----------LCD_CMD - receives COMMAND, returns void
+LCD_CMD     pop R7                        ; save return address
+            pop R6                        ; pop command to R6
+            push #1750                  
+            call #poll_delay              //delay here 5ms
+            mov.b R6, LCDDataPort          ; move command to CMD legs
+            call #LCD_Strobe              ; strobe routine  
+            push.w R7                     ; push back return address to TOS
+            ret
+
+;-----------LCD DRIVER COMMANDS - void functions
+LCDClear      push #0x01          ; Clear LCD
+              call #LCD_CMD
+              ret
+LCDCursorTo1  push #0x02          ; Move cursor to first sqaure TOP row
+              call #LCD_CMD
+              ret
+LCDCursorTo17 push.w #0xC0        ; Move cursor to first square BOTTOM row
+              call #LCD_CMD
+              ret
+LCDCursorOff  push.w #0x0C        ; Cursor visability = false
+              call #LCD_CMD
+              ret
+LCDCursorOn   push.w #0x0F        ; Cursor visability = true
+              call #LCD_CMD
+              ret
+LCDCursorR    push.w #0x14        ; Move cursor 1 block RIGHT
+              call #LCD_CMD
+              ret
+LCDCursorL    push.w #0x10        ; Move cursor 1 block LEFT
+              call #LCD_CMD
+              ret
+              
+;-----------LCD Write Char - receives ASCII returns void
+LCDPrintChar  pop R8                   ; save return address
+              pop R9                   ; save value to print
+              push   #1750              
+              call   #poll_delay         //delay here 5ms
+              clr.b  LCDDataPort        ; clear previous digit on block
+              bis.b  #LCDRS, LCDCMDPort ; set RS = 1
+              mov.b  R9, LCDDataPort    ; Print value to the screen
+              call   #LCD_Strobe        ; strobe routine 
+              bic.b  #LCDRS, LCDCMDPort ; set RS = 0
+              push.w R8                 ; push return address to TOS
+              ret
+;--------------------------------------------------------------------
+; Timer Abstraction Routines
+;--------------------------------------------------------------------             
+EnableTAIFG   bis.w #0x0002, Timer_A_CTL ; Allows for interrupt by TAIFG flag
+              ret
+DisableTAIFG  bic.w #0x0002, Timer_A_CTL ; Disables interrupt by TAIFG flag
+              ret
+ClearTAIFG    bic.w #0x0001, Timer_A_CTL ; Clears pending TAIFG
+              ret
+StopTimer     bic.w #TASSEL_2+MC_3, Timer_A_CTL
+              ret
+StopTimerA1   bic.w #TASSEL_2+MC_3, Timer_A1_CTL
+              ret             
+;--------------------------------------------------------------------
+;Print LEDs - function only with argument (without return value)  
+;--------------------------------------------------------------------
+//Print2LEDs    pop   R4        ; save return address
+//              pop   R5        ; get value to print
+//               
+//              mov.b R5,LEDsArrPort ;function body
+//              
+//              push.w  R4
+//              ret   
+;--------------------------------------------------------------------
+;Clear LEDs - void function (without arguments and return value)
+;--------------------------------------------------------------------
+//ClrLEDs       clr.b LEDsArrPort
+//              ret                 
+;--------------------------------------------------------------------
+;Read SWs -  function, without arguments and return value
+;--------------------------------------------------------------------
+//ReadSWs      pop     R4        ; save return address
+//
+//             mov.b   PBsArrPort,R5 ;function body
+//             and.b   #SWmask,R5
+//             push.w  R5            ;function body end
+//             
+//             push.w  R4
+//             ret
+;----------------------------------------------------------------------- 
+;            PORT2 Interrupt Service Routine
+;-----------------------------------------------------------------------
+PBs_handler  push.w #debounceVal
+             call   #poll_delay    
+             bit.b  #PB0,PBsArrIntPend   ; check if PB0 is pushed
+             jnz    PB0sel 
+             bit.b  #PB1,PBsArrIntPend   ; check if PB1 is pushed
+             jnz    PB1sel
+             reti                        ; interrupt hapened from another source
+             
+PB0sel       mov    #1,state 
+             jmp    WAKEUP
+PB1sel       mov    #2,state
+             jmp    WAKEUP
+
+WAKEUP       bic    #CPUOFF ,0(SP)        ; Exit LMP0
+             bic.b  #0x0F,PBsArrIntPend  
+             reti
+
+;----------------------------------------------------------------------------------------------   
+;            Timer Overflow Interrupt Service Routine
+;----------------------------------------------------------------------------------------------  
+                              
+TimerA0_ISR       bic #CPUOFF, 0(SP)
+                  RETI
+
+;----------------------------------------------------------------------------------------------
+;            Timer A1 Service Routine
+;----------------------------------------------------------------------------------------------
+TimerA1_ISR      add Timer_A1_flag, PC
+                 reti            // vector 0 - no interrupt
+                 reti     
+                 JMP ReadTA1CCR2 // vector 2 - CC2 interrupt    
+                 reti
+                 reti
+                 reti            // vector overflow
+                 reti
+                 reti
+
+ReadTA1CCR2      bic      #CCIFG, Timer_A1_CC2_CTL
+                 tst.b    flag
+                 jne      flag_1
+                 mov.w    Timer_A1_CC2_Reg, R10
+                 xor      #0x01, flag
+                 bic      #CPUOFF,0(SP)
+                 RETI
+
+flag_1           mov.w    Timer_A1_CC2_Reg, R11
+                 mov      R11,R12
+                 bic      #CCIE,Timer_A1_CC2_CTL                 
+                 sub      R10, R12
+                 jn       new_margin
+                 xor      #0x01, flag
+                 bic      #CPUOFF,0(SP)
+                 RETI
+
+new_margin       mov.w    #0xFFFF, R12
+                 sub      R10, R12
+                 add      R11, R12
+                 xor      #0x01,flag
+                 bic      #CPUOFF, 0(SP)
+                 RETI
+;----------------------------------------------------------------------------------------------
+;            5 chars stack LCD printer
+;---------------------------------------------------------------------------------------------- 
+StackFreqPrinter pop   R4       ;return adderres
+                 mov   #5,R10
+PrintLoop        dec   R10
+                 jn    PrintLoopExit
+                 call  #LCDPrintChar
+                 jmp   PrintLoop
+PrintLoopExit    ret
+                           
+;----------------------------------------------------------------------------------------------
+;            Timer based Delay function
+;----------------------------------------------------------------------------------------------                     
+poll_delay   pop   R4        ; save return address
+             pop   R5        ; get delay value
+             
+L            dec.w   R5      ;function body begin                 
+             jnz     L       ;function body end
+             
+             push.w  R4
+             ret
+
+;----------------------------------------------------------------------------------------------
+             ENDMOD
+             END
+
+
+ 

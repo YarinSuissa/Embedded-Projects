@@ -1,0 +1,74 @@
+#include "bsp.h"  
+
+                 MODULE     API
+                 PUBLIC     LedsUp,LedsB2B,PWM
+                 EXTERN     Delay
+                 EXTERN     state,State1time
+                 
+                 RSEG       CODE
+//==============================================================================
+//               Counting Leds Upwards
+//==============================================================================
+LedsUp           MOV.B       R7,LedsOUT   //Reconditioning Last Leds Display
+                 MOV         #0x14,R10    //Loop Counter - 20*0.5=10sec
+Loop             DEC         R10
+                 JZ          exitLedsUp
+                 INC.B       LedsOUT      //Leds display "counts" up
+                 CALL        #HalfSecDelay //0.5 second delay
+                 JMP         Loop
+                 
+exitLedsUp       MOV.B       LedsOUT,R7
+                 MOV.B       #0x00,PBsPEND
+                 MOV         #0x00,state
+                 RET
+//==============================================================================
+//              Counting Leds Downwards
+//==============================================================================
+LedsB2B          MOV.B       R8,LedsOUT//Reconditioning Last Leds Display
+                 CALL        #HalfSecDelay
+                 MOV         #0x0D,R10    //Loop Counter - 0.5+13*0.5=7sec
+Loop1            DEC         R10
+                 JZ          exitLedsB2B
+                 RLA.B       LedsOUT      //Leds display "counts" down
+                 JC          SetStart       //Reconditioning Leds to MAX
+                 CALL        #HalfSecDelay //0.5 second delay
+                 JMP         Loop1
+
+SetStart         MOV.B       #0x01,LedsOUT  //0xFF-->LedsOUT
+                 CALL        #HalfSecDelay
+                 JMP         Loop1
+
+exitLedsB2B      MOV.B       LedsOUT,R8
+                 MOV.B       #0x00,PBsPEND
+                 MOV         #0x00,state
+                 RET
+//==============================================================================
+//               PWM--Duty Cycle 75%--4KHz Frequency-p2.7
+//==============================================================================
+PWM              CMP       #0x03,state
+                 JNZ       exitPWM
+                 BIS.B     #0x80,PBsOUT
+                 MOV       #0x40,R11
+L                DEC.W     R11
+                 JNZ       L
+                 BIC.B     #0x80,PBsOUT
+                 MOV       #0x10,R11
+L1               DEC.W     R11
+                 JNZ       L1
+                 JMP       PWM
+
+exitPWM          RET
+//==============================================================================
+//               Delay 1/2 Second
+//==============================================================================
+
+HalfSecDelay     MOV         #0x0271,R11
+Loop3            DEC.W       R11
+                 JZ          Exit
+                 CALL        #Delay
+                 JMP         Loop3
+
+Exit             RET
+//==============================================================================
+                 ENDMOD
+                 END

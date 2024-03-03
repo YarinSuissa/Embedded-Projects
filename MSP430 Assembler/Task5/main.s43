@@ -1,0 +1,52 @@
+#include  "bsp.h"
+
+             NAME   main
+             PUBLIC state,main,flag
+             EXTERN SysConfig,ClrLEDs,IncLED,DecLED,delay,LCDCursorTo17
+             EXTERN PrintLEDs,ReadSWs,PrintSWs2LEDs,LCDPrintChar,LCDClear,LCDCursorOn
+             EXTERN StartTimer,StopTimer,EnableTAIFG,DisableTAIFG,ClearTAIFG
+             EXTERN PBs_handler,TimerA0_ISR,LCDMeasure
+             EXTERN LCDCountdown,TimerA0_CC0_ISR,TimerA1_ISR
+//==============================================================================         
+                ORG       0x200               
+state           DW        0
+flag            DW        0
+//==============================================================================
+                RSEG      CSTACK
+                RSEG      CODE
+//==============================================================================
+main            MOV       #SFE(CSTACK),SP   //INITIALIZING SP
+                CALL      #SysConfig
+//==============================================================================
+//               FSM Loop
+//==============================================================================
+State0          CMP       #0x00,state
+                JNZ       State1
+                CALL      #LCDClear
+                BIS.W     #CPUOFF+GIE,SR
+                NOP
+                
+State1          CMP       #0x01,state
+                JNZ       State2
+                EINT
+                CALL      #LCDCountdown
+                
+
+State2          CMP       #0x02,state
+                JNZ       State0
+                EINT
+                CALL      #LCDMeasure
+                
+;---------------------------------------------------------------------------------------                  
+             COMMON  INTVEC   ; Interrupt Vectors-Begins a common segment name of INTVEC 
+;--------------------------------------------------------------------------------------
+             ORG     PORT2_VECTOR       ; PORT2 Interrupt Vector
+             DW      PBs_handler        ; interrupt handler = ISR
+             ORG     TIMER0_A0_VECTOR   ; Timer_A0_CC0 Interrupt Vector
+             DW      TimerA0_ISR
+             ORG     TIMER1_A1_VECTOR   ; Timer_A1_CC1 Interrupt Vector
+             DW      TimerA1_ISR
+             ORG     RESET_VECTOR       ; MSP430 RESET Vector
+             DW      main  
+             
+                END

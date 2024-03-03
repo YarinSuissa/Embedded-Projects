@@ -1,0 +1,165 @@
+#include "bsp.h"  
+divider         MACRO   Divided,Divisor
+                LOCAL   L1,L2,L3
+                mov     #17,R9
+                clr     R13                ; Quotient register
+                mov.w   Divided,R4        ; Devided registers is R5,R4
+                clr     R15
+                mov.w   Divisor,R6        ; Divisor registers is R6
+                
+L3              rla     R13
+L1              dec     R9
+                jz      L2
+                rla     R4
+                rlc     R15
+                cmp     R6,R15
+                jlo     L3
+                sub     R6,R15
+                setc
+                rlc     R13
+                jmp     L1
+                
+L2              ENDM                       ;R13 is mana, R15 is she'erit
+                
+
+                  MODULE     API
+                  PUBLIC     LCDCountdown,LCDMeasure
+                  EXTERN     LCDConfig,LCD_CMD,LCDClear,LCDCursorTo1,margin
+                  EXTERN     LCDCursorOff,LCDCursorOn,LCDCursorR,LCDCursorL
+                  EXTERN     LCDCursorTo17,LCDPrintChar,TIMER1config
+                  EXTERN     state,StopTimer,StartTimer,poll_delay,DisableTAIFG,
+                  EXTERN     EnableTAIFG,TIMERconfig,StopTimer,originFlag
+                  EXTERN     flag,StackFreqPrinter
+                 
+                  RSEG       CODE
+//==============================================================================
+//                State 1 (PB0 was pressed) 
+//==============================================================================
+LCDCountdown      call #LCDConfig
+                  clr        R12
+                  mov        #'9' ,R10
+                  mov        #'5' ,R11 
+                  push       #'0'
+                  call       #LCDPrintChar
+                  push       #'1'
+                  call       #LCDPrintChar
+                  push       #':'
+                  call       #LCDPrintChar
+                  push       #'0'
+                  call       #LCDPrintChar
+                  push       #'0'
+                  call       #LCDPrintChar
+                  call       #TIMERconfig                 
+LCDCountdownLoop  bis        #CPUOFF+GIE, SR // Go to sleep
+                  call       #LCDClear
+                  push       #'0'
+                  call       #LCDPrintChar
+                  push       #'0'
+                  call       #LCDPrintChar
+                  push       #':'
+                  call       #LCDPrintChar
+                  push       R11
+                  call       #LCDPrintChar
+                  push       R10
+                  call       #LCDPrintChar
+                  call       #CountdownDec
+                  cmp        #1, R12
+                  JNZ        LCDCountdownLoop
+                  mov        #0x00,state
+                  RET                
+//----------------------------------------------------------------------
+CountdownDec      DEC        R10
+                  CMP        #'/', R10
+                  JZ         Decrease
+                  ret
+Decrease          MOV        #'9', R10
+                  DEC        R11
+                  CMP        #'/', R11
+                  JZ         breakloop1
+                  ret
+breakloop1        call       #StopTimer
+                  mov.b      #1, R12
+                  RET
+//----------------------------------------------------------------------
+//                MISSION 2
+//----------------------------------------------------------------------
+
+LCDMeasure        call      #LCDHeadline
+                  clr       R12       //t1-t0
+                  clr       R10       //t0
+                  clr       R11       //t1
+                  call      #TIMER1config
+
+FindFreqLoop      bis.w     #LPM0+GIE,SR
+                  tst.b     flag
+                  jne       FindFreqLoop    
+                  call      #FindFreq
+                  mov       #5,R14
+
+PrintFreq         divider   R12,#10
+                  add       #48,R15
+                  push      R15     ; PRINT
+                  mov       R13,R12
+                  dec       R14
+                  jnz       PrintFreq
+                  call      #LCDCursorTo17
+                  call      #StackFreqPrinter
+                  cmp       #2,state
+                  jne       StopMeasure
+                  bic       #CCIFG,Timer_A1_CC2_CTL 
+                  bis       #CCIE,Timer_A1_CC2_CTL 
+                  jmp       FindFreqLoop
+StopMeasure       RET
+
+
+
+LCDHeadline       call #LCDConfig
+//----------------Write: "Measured Freq.:"
+                  push       #'M'
+                  call       #LCDPrintChar
+                  push       #'e'
+                  call       #LCDPrintChar
+                  push       #'a'
+                  call       #LCDPrintChar
+                  push       #'s'
+                  call       #LCDPrintChar
+                  push       #'u'
+                  call       #LCDPrintChar
+                  push       #'r'
+                  call       #LCDPrintChar
+                  push       #'e'
+                  call       #LCDPrintChar
+                  push       #'d'
+                  call       #LCDPrintChar
+                  push       #' '
+                  call       #LCDPrintChar
+                  push       #'F'
+                  call       #LCDPrintChar
+                  push       #'r'
+                  call       #LCDPrintChar
+                  push       #'e'
+                  call       #LCDPrintChar
+                  push       #'q'
+                  call       #LCDPrintChar
+                  push       #'.'
+                  call       #LCDPrintChar
+                  push       #':'
+                  call       #LCDPrintChar
+                  ret
+
+FindFreq          mov        #0X8000,R10
+                  clr        R11
+subway            inc        R11
+                  sub        R12,R10
+                  jz         equal
+                  jn         neg
+                  jmp        subway
+neg               dec        R11
+equal             rla        R11
+                  rla        R11
+                  mov        R11,R12
+                  RET
+
+
+                  ENDMOD
+                  END

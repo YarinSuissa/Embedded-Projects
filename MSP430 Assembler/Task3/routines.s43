@@ -1,0 +1,99 @@
+#include <msp430g2553.h>     ;define controlled include file
+//=================================
+      MODULE Routines
+      PUBLIC CONFIG, ST01, ST02, ST04, STOT
+      EXTERN Delay1sec
+      RSEG CODE
+      
+CONFIG        BIC.B #0x0F,&P1DIR //SET SWx to INPUT
+              BIS.B #0xF0,&P1DIR
+              BIC.B #0XC0,&P2SEL
+              BIS.B #0xFF,&P2DIR //LED TO PORT 2 
+              BIC.B #0xFF,&P2OUT //CLEAR all LEDs
+              RET
+//============ST01=============
+ST01          BIT.B #0xFE,&P1IN
+              JNZ ST01RET         
+              BIT.B 0xFF,&P1IN
+              JZ ST01RET
+              INC.B &P2OUT        
+              CALL #Delay1sec     
+              CMP.B #0xFF, &P2OUT
+              JZ ST01Loop
+              JMP ST01
+ST01Loop      BIC.B #0xFF, &P2OUT
+              JMP ST01     
+ST01RET       RET
+              
+//============ST02=============
+ST02          BIT.B #0xFD,&P1IN
+              JNZ ST02RET
+              BIT.B 0xFF,&P1IN
+              JZ ST02RET
+              BIS.B #0xFF,&P2OUT //SET ALL LEDs TO 1
+              CALL #Delay1sec
+ST02Loop      BIT.B 0xFF,&P1IN //IS INPUT 0x0?
+              JZ ST02RET //IF SO, JMP
+              CMP.B #0x02,&P1IN // IS THIS THE RIGHT FUNC?
+              JNZ ST02RET //IF NOT, JMP
+              DEC.B &P2OUT 
+              CALL #Delay1sec
+              CMP.B #0x0, &P2OUT //IF REACHED MIN, JMP to START
+              JZ ST02
+              JMP ST02Loop
+ST02RET       RET
+             
+//============ST04=============
+ST04          MOV R4, R7
+              MOV R5, R8
+              MOV R6, R9
+              MOV R6, R10
+              
+LA            BIT.B 0xFF,&P1IN
+              JZ ST04RET
+              BIT.B #0xFB,&P1IN
+              JNZ ST04RET
+              DEC R9
+              JN LB
+              MOV.B @R7,&P2OUT
+              INCD R7
+              CALL #Delay1sec
+              JMP LA
+LB            BIT.B 0xFF,&P1IN
+              JZ ST04RET
+              CMP.B #0x04,&P1IN
+              JNZ ST04RET
+              DEC R10
+              JN ST04
+              MOV.B @R8,&P2OUT
+              INCD R8
+              CALL #Delay1sec
+              JMP LB              
+
+ST04RET       RET            
+              
+//============STOT=============
+STOT          BIC.B #0xFF,&P2OUT
+              RET
+              ENDMOD             
+//=================================
+      MODULE DELAY
+      PUBLIC Delay1sec
+      RSEG CODE
+      
+Delay100us    MOV.W #0x7EFF,R15
+L1            DEC.W R15
+              JNZ L1
+              ret
+              
+Delay1sec     MOV.W #7,R13
+L2            CALL #Delay100us
+              DEC.W R13
+              JNZ L2
+              RET
+
+              ENDMOD
+              
+//=================================
+
+              END

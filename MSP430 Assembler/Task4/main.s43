@@ -1,0 +1,52 @@
+#include "bsp.h"
+                 
+                 NAME      MAIN
+                 PUBLIC    state
+                 EXTERN    SysConfig,ClearLeds,LedsUp,LedsB2B,Delay
+                 EXTERN    PORT2_ISR,PWM
+//==============================================================================         
+                 ORG       0x200
+//==============================================================================               
+state            DW        0
+//==============================================================================
+                 RSEG      CSTACK
+                 RSEG      CODE
+//==============================================================================
+MAIN             MOV       #SFE(CSTACK),SP   //INITIALIZING SP 
+                 MOV       #WDTPW+WDTHOLD,&WDTCTL
+                 CALL      #SysConfig
+//==============================================================================
+//               FSM Loop
+//==============================================================================
+State0           CMP       #0x00,state
+                 JNZ       State1
+                 CALL      #ClearLeds
+                 BIS.W     #CPUOFF+GIE,SR
+                 NOP
+
+State1           CMP       #0x01,state
+                 JNZ       State2
+                 DINT 
+                 CALL      #LedsUp
+                 EINT
+                   
+State2           CMP       #0x02,state
+                 JNZ       State3
+                 DINT 
+                 CALL      #LedsB2B              
+                 EINT
+                 
+State3           CMP       #0x03,state
+                 JNZ       State0
+                 CALL      #PWM
+                 JMP       State0
+                 NOP     
+//==============================================================================
+                 COMMON   INTVEC
+//==============================================================================
+                 ORG      PORT2_VECTOR
+                 DW       PORT2_ISR
+                 ORG      RESET_VECTOR
+                 DW       MAIN
+                 END
+                 

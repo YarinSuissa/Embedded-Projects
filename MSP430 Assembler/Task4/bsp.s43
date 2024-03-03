@@ -1,0 +1,29 @@
+#include "bsp.h"
+
+                 MODULE   BSP
+                 PUBLIC   GPIOconfig
+          
+                 RSEG     CODE
+ //=============================================================================
+ //         GPIOconfig
+ //=============================================================================
+GPIOconfig       CLR.B    LedsSEL           //P2->GPIO
+                 BIS.B    #0xFF,LedsDIR     //P1->OUTPUT
+                 CLR.B    LedsOUT           //INITIAL LEDS STATE - TURNED OFF
+                 
+                 BIC.B    #0x8F,PBsSEL      //P2->GPIO
+                 BIC.B    #0x0F,PBsDIR      //P2<4..0>->INPUT
+                 BIS.B    #0x80,PBsDIR      //P2.7-->OUTPUT
+                 BIS.B    #0x03,PBsEDGE     //P2.0 , P2.1 -> PULL UP FALLING EDGE
+                 BIC.B    #0x0C,PBsEDGE     //P2.2,  P2.3 -> PULL DOWN RISING EDGE
+                 BIS.B    #0x07,PBsENABLE   //ENABLE ISR CAUSED BY PUSHING P1.X(0<=X<=3)
+                 BIC.B    #0xFF,PBsPEND     //CLEAR PENDING INTERRUPTS 
+                 BIC.B    #0xFF,PBsOUT      //CLEAR P2.7 
+                 
+                 CLR       R7
+                 MOV       #0x01,R8
+                 
+                 RET
+                 
+                 ENDMOD
+                 END
